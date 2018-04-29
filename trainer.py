@@ -247,7 +247,8 @@ class trainer:
         
         
         for step in range(2, self.max_resl+1+5):
-            for iter in tqdm(range(0,(self.trns_tick*2+self.stab_tick*2)*self.TICK, self.loader.batchsize)):
+            try:
+                for iter in tqdm(range(0,(self.trns_tick*2+self.stab_tick*2)*self.TICK, self.loader.batchsize)):
                 self.globalIter = self.globalIter+1
                 self.stack = self.stack + self.loader.batchsize
                 if self.stack > ceil(len(self.loader.dataset)):
@@ -256,7 +257,7 @@ class trainer:
 
                 # reslolution scheduler.
                 self.resl_scheduler()
-                
+
                 # zero gradients.
                 self.G.zero_grad()
                 self.D.zero_grad()
@@ -267,7 +268,7 @@ class trainer:
                     self.x = self.add_noise(self.x)
                 self.z.data.resize_(self.loader.batchsize, self.nz).normal_(0.0, 1.0)
                 self.x_tilde = self.G(self.z)
-               
+
                 self.fx = self.D(self.x)
                 self.fx_tilde = self.D(self.x_tilde.detach())
                 loss_d = self.mse(self.fx, self.real_label) + self.mse(self.fx_tilde, self.fake_label)
@@ -282,7 +283,11 @@ class trainer:
                 self.opt_g.step()
 
                 # logging.
-                log_msg = ' [E:{0}][T:{1}][{2:6}/{3:6}]  errD: {4:.4f} | errG: {5:.4f} | [lr:{11:.5f}][cur:{6:.3f}][resl:{7:4}][{8}][{9:.1f}%][{10:.1f}%]'.format(self.epoch, self.globalTick, self.stack, len(self.loader.dataset), loss_d.data[0], loss_g.data[0], self.resl, int(pow(2,floor(self.resl))), self.phase, self.complete['gen'], self.complete['dis'], self.lr)
+                log_msg = '' \
+                          ''.format(
+                    self.epoch, self.globalTick, self.stack, len(self.loader.dataset), loss_d.data[0], loss_g.data[0],
+                    self.resl, int(pow(2, floor(self.resl))), self.phase, self.complete['gen'], self.complete['dis'],
+                    self.lr)
                 tqdm.write(log_msg)
 
                 # save model.
@@ -307,6 +312,8 @@ class trainer:
                     self.tb.add_image_grid('grid/x_test', 4, utils.adjust_dyn_range(x_test.data.float(), [-1,1], [0,1]), self.globalIter)
                     self.tb.add_image_grid('grid/x_tilde', 4, utils.adjust_dyn_range(self.x_tilde.data.float(), [-1,1], [0,1]), self.globalIter)
                     self.tb.add_image_grid('grid/x_intp', 4, utils.adjust_dyn_range(self.x.data.float(), [-1,1], [0,1]), self.globalIter)
+            except:
+                continue
 
 
     def get_state(self, target):
@@ -349,6 +356,6 @@ for k, v in vars(config).items():
 print '-------------------------------------------------'
 torch.backends.cudnn.benchmark = True           # boost speed.
 trainer = trainer(config)
-trainer.train()
+#trainer.train()
 
 
