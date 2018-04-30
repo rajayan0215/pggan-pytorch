@@ -288,7 +288,10 @@ class trainer:
                         self.epoch, self.globalTick, self.stack, len(self.loader.dataset), loss_d.data[0], loss_g.data[0],
                         self.resl, int(pow(2, floor(self.resl))), self.phase, self.complete['gen'], self.complete['dis'],
                         self.lr)
-                    tqdm.write(log_msg)
+                    try:
+                        tqdm.write(log_msg)
+                    except:
+                        continue
 
                     # save model.
                     self.snapshot('repo/model')
@@ -314,6 +317,93 @@ class trainer:
                         self.tb.add_image_grid('grid/x_intp', 4, utils.adjust_dyn_range(self.x.data.float(), [-1,1], [0,1]), self.globalIter)
             except:
                 continue
+
+    def train1(self):
+        # noise for test.
+        self.z_test = torch.FloatTensor(self.loader.batchsize, self.nz)
+        if self.use_cuda:
+            self.z_test = self.z_test.cuda()
+        self.z_test = Variable(self.z_test, volatile=True)
+        self.z_test.data.resize_(self.loader.batchsize, self.nz).normal_(0.0, 1.0)
+
+        for step in range(2, self.max_resl + 1 + 5):
+            for iter in tqdm(range(0, (self.trns_tick * 2 + self.stab_tick * 2) * self.TICK, self.loader.batchsize)):
+                self.globalIter = self.globalIter + 1
+                self.stack = self.stack + self.loader.batchsize
+                if self.stack > ceil(len(self.loader.dataset)):
+                    self.epoch = self.epoch + 1
+                    self.stack = int(self.stack % (ceil(len(self.loader.dataset))))
+
+                # reslolution scheduler.
+                self.resl_scheduler()
+
+                # zero gradients.
+                self.G.zero_grad()
+                self.D.zero_grad()
+
+                # update discriminator.
+                self.x.data = self.feed_interpolated_input(self.loader.get_batch())
+                if self.flag_add_noise:
+                    self.x = self.add_noise(self.x)
+                self.z.data.resize_(self.loader.batchsize, self.nz).normal_(0.0, 1.0)
+                self.x_tilde = self.G(self.z)
+
+                self.fx = self.D(self.x)
+                self.fx_tilde = self.D(self.x_tilde.detach())
+                loss_d = self.mse(self.fx, self.real_label) + self.mse(self.fx_tilde, self.fake_label)
+
+                loss_d.backward()
+                self.opt_d.step()
+
+                # update generator.
+                fx_tilde = self.D(self.x_tilde)
+                loss_g = self.mse(fx_tilde, self.real_label.detach())
+                loss_g.backward()
+                self.opt_g.step()
+
+                # logging.
+                log_msg = '' \
+                          ''.format(
+                    self.epoch, self.globalTick, self.stack, len(self.loader.dataset), loss_d.data[0],
+                    loss_g.data[0],
+                    self.resl, int(pow(2, floor(self.resl))), self.phase, self.complete['gen'],
+                    self.complete['dis'],
+                    self.lr)
+                tqdm.write(log_msg)
+
+                # save model.
+                self.snapshot('repo/model')
+
+                # save image grid.
+                if self.globalIter % self.config.save_img_every == 0:
+                    x_test = self.G(self.z_test)
+                    os.system('mkdir -p repo/save/grid')
+                    utils.save_image_grid(x_test.data, 'repo/save/grid/{}_{}_G{}_D{}.jpg'.format(
+                        int(self.globalIter / self.config.save_img_every), self.phase, self.complete['gen'],
+                        self.complete['dis']))
+                    os.system('mkdir -p repo/save/resl_{}'.format(int(floor(self.resl))))
+                    utils.save_image_single(x_test.data,
+                                            'repo/save/resl_{}/{}_{}_G{}_D{}.jpg'.format(int(floor(self.resl)), int(
+                                                self.globalIter / self.config.save_img_every), self.phase,
+                                                                                         self.complete['gen'],
+                                                                                         self.complete['dis']))
+
+                # tensorboard visualization.
+                if self.use_tb:
+                    x_test = self.G(self.z_test)
+                    self.tb.add_scalar('data/loss_g', loss_g.data[0], self.globalIter)
+                    self.tb.add_scalar('data/loss_d', loss_d.data[0], self.globalIter)
+                    self.tb.add_scalar('tick/lr', self.lr, self.globalIter)
+                    self.tb.add_scalar('tick/cur_resl', int(pow(2, floor(self.resl))), self.globalIter)
+                    self.tb.add_image_grid('grid/x_test', 4,
+                                           utils.adjust_dyn_range(x_test.data.float(), [-1, 1], [0, 1]),
+                                           self.globalIter)
+                    self.tb.add_image_grid('grid/x_tilde', 4,
+                                           utils.adjust_dyn_range(self.x_tilde.data.float(), [-1, 1], [0, 1]),
+                                           self.globalIter)
+                    self.tb.add_image_grid('grid/x_intp', 4,
+                                           utils.adjust_dyn_range(self.x.data.float(), [-1, 1], [0, 1]),
+                                           self.globalIter)
 
 
     def get_state(self, target):
@@ -356,6 +446,6 @@ for k, v in vars(config).items():
 print '-------------------------------------------------'
 torch.backends.cudnn.benchmark = True           # boost speed.
 trainer = trainer(config)
-#trainer.train()
+trainer.train1()
 
 
