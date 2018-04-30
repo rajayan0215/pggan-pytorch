@@ -283,10 +283,11 @@ class trainer:
                     self.opt_g.step()
 
                     # logging.
-                    log_msg = '' \
-                              ''.format(
-                        self.epoch, self.globalTick, self.stack, len(self.loader.dataset), loss_d.data[0], loss_g.data[0],
-                        self.resl, int(pow(2, floor(self.resl))), self.phase, self.complete['gen'], self.complete['dis'],
+                    log_msg = ' [E:{0}][T:{1}][{2:6}/{3:6}]  errD: {4:.4f} | errG: {5:.4f} | [lr:{11:.5f}][cur:{6:.3f}][resl:{7:4}][{8}][{9:.1f}%][{10:.1f}%]'.format(
+                        self.epoch, self.globalTick, self.stack, len(self.loader.dataset), loss_d.data[0],
+                        loss_g.data[0],
+                        self.resl, int(pow(2, floor(self.resl))), self.phase, self.complete['gen'],
+                        self.complete['dis'],
                         self.lr)
                     try:
                         tqdm.write(log_msg)
@@ -362,12 +363,9 @@ class trainer:
                 self.opt_g.step()
 
                 # logging.
-                log_msg = '' \
-                          ''.format(
-                    self.epoch, self.globalTick, self.stack, len(self.loader.dataset), loss_d.data[0],
-                    loss_g.data[0],
-                    self.resl, int(pow(2, floor(self.resl))), self.phase, self.complete['gen'],
-                    self.complete['dis'],
+                log_msg = ' [E:{0}][T:{1}][{2:6}/{3:6}]  errD: {4:.4f} | errG: {5:.4f} | [lr:{11:.5f}][cur:{6:.3f}][resl:{7:4}][{8}][{9:.1f}%][{10:.1f}%]'.format(
+                    self.epoch, self.globalTick, self.stack, len(self.loader.dataset), loss_d.data[0], loss_g.data[0],
+                    self.resl, int(pow(2, floor(self.resl))), self.phase, self.complete['gen'], self.complete['dis'],
                     self.lr)
                 tqdm.write(log_msg)
 
